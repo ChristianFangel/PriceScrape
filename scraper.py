@@ -34,10 +34,7 @@ class CompetitorScraper:
                 'url': 'https://withmantle.com/pricing',
                 'name': 'Mantle'
             },
-            'clara': {
-                'url': 'https://clara.co/pricing/',
-                'name': 'Clara'
-            }
+
         }
         
         # In-memory storage for scraped data
@@ -140,8 +137,7 @@ class CompetitorScraper:
             return self._extract_cakeequity_pricing(soup)
         elif competitor_key == 'mantle':
             return self._extract_mantle_pricing(soup)
-        elif competitor_key == 'clara':
-            return self._extract_clara_pricing(soup)
+
         else:
             # Fallback: extract general pricing information
             return self._extract_generic_pricing(soup, raw_html)
@@ -160,8 +156,8 @@ class CompetitorScraper:
         if "Raise" in text_content:
             plans.append({
                 'name': 'Raise',
-                'price': '£250 per year',
-                'description': 'Up to five stakeholders',
+                'price': '£21/month',
+                'description': 'Up to five stakeholders (£250/year)',
                 'features': ['Cap table management', 'Advance Assurance', 'Round modelling']
             })
         
@@ -192,7 +188,7 @@ class CompetitorScraper:
         return {
             'plans': plans,
             'currency': 'GBP',
-            'billing_period': 'annual',
+            'billing_period': 'monthly',
             'raw_text_extract': self._get_pricing_text_extract(soup)
         }
 
@@ -213,16 +209,16 @@ class CompetitorScraper:
         if "Starter" in text_content and "395 kr" in text_content:
             plans.append({
                 'name': 'Starter',
-                'price': '395 kr per månad / 3,950 kr per år',
-                'description': '12 månaders bindningstid',
+                'price': '329 kr/month',
+                'description': '12 månaders bindningstid (3,950 kr/year)',
                 'features': ['Aktiebok (till 15 aktieägare)', 'Upp till 2 användare', 'Dokumenthantering', 'E-Signatur']
             })
         
         if "Grow" in text_content and "1 695 kr" in text_content:
             plans.append({
                 'name': 'Grow',
-                'price': '1,695 kr per månad / 16,950 kr per år',
-                'description': '12 månaders bindningstid',
+                'price': '1,413 kr/month',
+                'description': '12 månaders bindningstid (16,950 kr/year)',
                 'features': ['Aktiebok (till 25 aktieägare)', 'Styrelseportal', 'Bolagsstämmor', 'Optionsprogram']
             })
         
@@ -285,16 +281,16 @@ class CompetitorScraper:
         if "Growth" in text_content and "€900/year" in text_content:
             plans.append({
                 'name': 'Growth',
-                'price': 'Starts at €900/year',
-                'description': '25 to 50 stakeholders included',
+                'price': '€75/month',
+                'description': '25 to 50 stakeholders included (€900/year)',
                 'features': ['Cap Table Management', 'Document templating', 'Employee dashboards', 'Custom reporting']
             })
         
         if "Scale" in text_content and "€3k/year" in text_content:
             plans.append({
                 'name': 'Scale',
-                'price': 'Starts at €3k/year',
-                'description': '50+ stakeholders included',
+                'price': '€250/month',
+                'description': '50+ stakeholders included (€3k/year)',
                 'features': ['70+ HRIS integrations', 'Exit waterfall modeling', 'Automated granting', 'Onboarding Consultant']
             })
         
@@ -309,7 +305,7 @@ class CompetitorScraper:
         return {
             'plans': plans,
             'currency': 'EUR',
-            'billing_period': 'annual',
+            'billing_period': 'monthly',
             'raw_text_extract': self._get_pricing_text_extract(soup)
         }
 
@@ -356,11 +352,50 @@ class CompetitorScraper:
 
     def _extract_mantle_pricing(self, soup):
         """Extract Mantle pricing information"""
-        return self._extract_generic_pricing(soup, soup.get_text())
+        plans = []
+        text_content = soup.get_text()
+        
+        # Enhanced Mantle-specific extraction
+        # Look for their specific pricing structure
+        if "free" in text_content.lower():
+            plans.append({
+                'name': 'Free',
+                'price': 'Free',
+                'description': 'Basic equity management',
+                'features': ['Cap table management', 'Basic reporting']
+            })
+        
+        # Look for Starter plan
+        starter_match = re.search(r'starter.*?(\$\d+)', text_content, re.IGNORECASE | re.DOTALL)
+        if starter_match:
+            plans.append({
+                'name': 'Starter',
+                'price': f'{starter_match.group(1)}/month',
+                'description': 'Growing companies',
+                'features': ['Advanced cap table', 'Stakeholder portal', 'Reporting']
+            })
+        
+        # Look for Pro plan
+        pro_match = re.search(r'pro.*?(\$\d+)', text_content, re.IGNORECASE | re.DOTALL)
+        if pro_match:
+            plans.append({
+                'name': 'Pro',
+                'price': f'{pro_match.group(1)}/month',
+                'description': 'Scaling companies',
+                'features': ['Everything in Starter', 'Advanced analytics', 'Priority support']
+            })
+        
+        if not plans:
+            return self._extract_generic_pricing(soup, text_content)
+        
+        return {
+            'plans': plans,
+            'currency': 'USD',
+            'billing_period': 'monthly',
+            'raw_text_extract': self._get_pricing_text_extract(soup)
+        }
 
-    def _extract_clara_pricing(self, soup):
-        """Extract Clara pricing information"""
-        return self._extract_generic_pricing(soup, soup.get_text())
+
 
     def _extract_generic_pricing(self, soup, raw_html):
         """Generic pricing extraction for sites we haven't specifically implemented"""
