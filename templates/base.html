@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Competitor Pricing Monitor{% endblock %}</title>
+    
+    <!-- Bootstrap CSS (Replit Dark Theme) -->
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        .pricing-card {
+            transition: transform 0.2s;
+        }
+        .pricing-card:hover {
+            transform: translateY(-5px);
+        }
+        .error-state {
+            opacity: 0.6;
+        }
+        .success-indicator {
+            color: var(--bs-success);
+        }
+        .error-indicator {
+            color: var(--bs-danger);
+        }
+        .last-updated {
+            font-size: 0.875rem;
+            color: var(--bs-secondary);
+        }
+        .feature-list {
+            font-size: 0.9rem;
+        }
+        .competitor-header {
+            border-left: 4px solid var(--bs-primary);
+            padding-left: 1rem;
+        }
+        .refresh-btn {
+            transition: transform 0.2s;
+        }
+        .refresh-btn:hover {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-graph-up"></i>
+                Competitor Pricing Monitor
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline">
+                    <button type="submit" class="btn btn-outline-primary me-2 refresh-btn">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        Refresh All
+                    </button>
+                </form>
+                <a href="{{ url_for('export_data') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-download"></i>
+                    Export Data
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="py-4">
+        <div class="container">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' if category == 'success' else 'info-circle' }}"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer class="bg-dark text-center py-3 mt-5">
+        <div class="container">
+            <small class="text-muted">
+                Competitor Pricing Monitor &copy; 2025 | 
+                Last updated: <span id="current-time"></span>
+            </small>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString();
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // Auto-hide alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

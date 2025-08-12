@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Competitor Pricing Monitor{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="mb-0">
+                <i class="bi bi-speedometer2"></i>
+                Pricing Dashboard
+            </h1>
+            <div class="text-muted">
+                <small>
+                    <i class="bi bi-clock"></i>
+                    Monitoring {{ data|length }} competitors
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not data %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle fs-1 d-block mb-3"></i>
+            <h4>No Data Available</h4>
+            <p>Click "Refresh All" to start scraping competitor pricing data.</p>
+            <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Start Scraping
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ data|length }}</h3>
+                <small>Total Competitors</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ data.values()|selectattr('success')|list|length }}</h3>
+                <small>Successfully Scraped</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ data.values()|rejectattr('success')|list|length }}</h3>
+                <small>Failed Scrapes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info">
+            <div class="card-body text-center">
+                <h3 class="mb-0">
+                    {% if data.values()|list %}
+                        {{ ((data.values()|list|map(attribute='last_updated')|list|max)|from_iso).strftime('%H:%M') }}
+                    {% else %}
+                        --:--
+                    {% endif %}
+                </h3>
+                <small>Last Updated</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Competitor Cards -->
+<div class="row">
+    {% for competitor_id, competitor_data in data.items() %}
+    <div class="col-lg-6 mb-4">
+        <div class="card pricing-card h-100 {% if not competitor_data.success %}error-state{% endif %}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="competitor-header">
+                    <h5 class="mb-0">
+                        {% if competitor_data.success %}
+                            <i class="bi bi-check-circle success-indicator"></i>
+                        {% else %}
+                            <i class="bi bi-x-circle error-indicator"></i>
+                        {% endif %}
+                        {{ competitor_data.name }}
+                    </h5>
+                    <div class="last-updated">
+                        <i class="bi bi-clock"></i>
+                        {% if competitor_data.last_updated %}
+                            {{ competitor_data.last_updated|from_iso|timesince }} ago
+                        {% else %}
+                            Never updated
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <a href="{{ url_for('refresh_single', competitor=competitor_id) }}" 
+                       class="btn btn-outline-primary btn-sm refresh-btn" 
+                       title="Refresh {{ competitor_data.name }}">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                    <a href="{{ competitor_data.url }}" 
+                       target="_blank" 
+                       class="btn btn-outline-secondary btn-sm" 
+                       title="Visit {{ competitor_data.name }}">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                {% if competitor_data.success and competitor_data.pricing_data %}
+                    {% set pricing = competitor_data.pricing_data %}
+                    
+                    <!-- Pricing Plans -->
+                    {% if pricing.plans %}
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-2">
+                                <i class="bi bi-tags"></i>
+                                Pricing Plans ({{ pricing.currency or 'Unknown' }})
+                            </h6>
+                            <div class="row">
+                                {% for plan in pricing.plans %}
+                                <div class="col-12 mb-2">
+                                    <div class="border rounded p-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong>{{ plan.name }}</strong>
+                                                {% if plan.description %}
+                                                    <br><small class="text-muted">{{ plan.description }}</small>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="badge bg-primary">{{ plan.price }}</span>
+                                            </div>
+                                        </div>
+                                        {% if plan.features %}
+                                            <div class="mt-2">
+                                                <small class="text-muted feature-list">
+                                                    {% for feature in plan.features[:3] %}
+                                                        <i class="bi bi-check2"></i> {{ feature }}{% if not loop.last %}<br>{% endif %}
+                                                    {% endfor %}
+                                                    {% if plan.features|length > 3 %}
+                                                        <br><em>+{{ plan.features|length - 3 }} more features</em>
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Additional Info -->
+                    {% if pricing.pricing_mentions %}
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-2">
+                                <i class="bi bi-currency-dollar"></i>
+                                Pricing Mentions
+                            </h6>
+                            <div class="small">
+                                {% for mention in pricing.pricing_mentions[:5] %}
+                                    <span class="badge bg-secondary me-1 mb-1">{{ mention }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Raw Extract -->
+                    {% if pricing.raw_text_extract %}
+                        <details class="mt-2">
+                            <summary class="text-muted small" style="cursor: pointer;">
+                                <i class="bi bi-file-text"></i> View extracted content
+                            </summary>
+                            <div class="mt-2 p-2 bg-dark rounded small" style="max-height: 200px; overflow-y: auto;">
+                                {{ pricing.raw_text_extract }}
+                            </div>
+                        </details>
+                    {% endif %}
+                    
+                {% else %}
+                    <!-- Error State -->
+                    <div class="text-center py-4">
+                        <i class="bi bi-exclamation-triangle error-indicator fs-1 d-block mb-2"></i>
+                        <h6 class="text-muted">Scraping Failed</h6>
+                        {% if competitor_data.error %}
+                            <p class="small text-danger mb-0">{{ competitor_data.error }}</p>
+                        {% endif %}
+                        <div class="mt-3">
+                            <a href="{{ url_for('refresh_single', competitor=competitor_id) }}" 
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Retry Scraping
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="bi bi-link-45deg"></i>
+                        <a href="{{ competitor_data.url }}" target="_blank" class="text-decoration-none">
+                            {{ competitor_data.url|truncate(40) }}
+                        </a>
+                    </small>
+                    {% if competitor_data.success %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Error</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pricing Comparison Table -->
+{% set successful_competitors = data.values()|selectattr('success')|list %}
+{% if successful_competitors|length > 1 %}
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-table"></i>
+                    Pricing Comparison
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Competitor</th>
+                                <th>Free Plan</th>
+                                <th>Starting Price</th>
+                                <th>Enterprise</th>
+                                <th>Currency</th>
+                                <th>Billing</th>
+                                <th>Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for competitor_data in successful_competitors %}
+                            {% set pricing = competitor_data.pricing_data %}
+                            <tr>
+                                <td>
+                                    <strong>{{ competitor_data.name }}</strong>
+                                </td>
+                                <td>
+                                    {% set free_plans = pricing.plans|selectattr('price', 'match', '.*(?:free|gratis|0).*')|list %}
+                                    {% if free_plans %}
+                                        <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">No</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if pricing.plans %}
+                                        {% set paid_plans = pricing.plans|rejectattr('price', 'match', '.*(?:free|gratis|0).*')|list %}
+                                        {% if paid_plans %}
+                                            {{ paid_plans[0].price }}
+                                        {% else %}
+                                            {{ pricing.plans[0].price }}
+                                        {% endif %}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set enterprise_plans = pricing.plans|selectattr('name', 'match', '.*(enterprise|custom|scale).*')|list %}
+                                    {% if enterprise_plans %}
+                                        {{ enterprise_plans[0].price }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ pricing.currency or 'Unknown' }}</span>
+                                </td>
+                                <td>
+                                    {{ pricing.billing_period|title or 'Unknown' }}
+                                </td>
+                                <td class="small">
+                                    {{ competitor_data.last_updated|from_iso|timesince }} ago
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh functionality (optional)
+function autoRefresh() {
+    if (confirm('Auto-refresh will reload pricing data every 5 minutes. Continue?')) {
+        setInterval(function() {
+            window.location.reload();
+        }, 5 * 60 * 1000); // 5 minutes
+    }
+}
+
+// Add some interactivity to pricing cards
+document.addEventListener('DOMContentLoaded', function() {
+    // Add hover effects to competitor cards
+    const cards = document.querySelectorAll('.pricing-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.boxShadow = '';
+        });
+    });
+});
+
+// Custom filter functions for Jinja2 templates
+function fromIso(dateString) {
+    return new Date(dateString);
+}
+
+function timeSince(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return diffMins + ' minute' + (diffMins !== 1 ? 's' : '');
+    if (diffHours < 24) return diffHours + ' hour' + (diffHours !== 1 ? 's' : '');
+    return diffDays + ' day' + (diffDays !== 1 ? 's' : '');
+}
+</script>
+
+{% endblock %}
