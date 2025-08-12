@@ -53,16 +53,6 @@
             </a>
             
             <div class="navbar-nav ms-auto">
-                <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline">
-                    <button type="submit" class="btn btn-outline-primary me-2 refresh-btn">
-                        <i class="bi bi-arrow-clockwise"></i>
-                        Refresh All
-                    </button>
-                </form>
-                <a href="{{ url_for('export_data') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-download"></i>
-                    Export Data
-                </a>
             </div>
         </div>
     </nav>
@@ -88,10 +78,6 @@
 
     <footer class="bg-dark text-center py-3 mt-5">
         <div class="container">
-            <small class="text-muted">
-                Competitor Pricing Monitor &copy; 2025 | 
-                Last updated: <span id="current-time"></span>
-            </small>
         </div>
     </footer>
 
