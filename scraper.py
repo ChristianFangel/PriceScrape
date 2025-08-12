@@ -329,8 +329,19 @@ class CompetitorScraper:
         """Generic pricing extraction for sites we haven't specifically implemented"""
         plans = []
         
-        # Use trafilatura to get clean text content
-        text_content = trafilatura.extract(raw_html) if raw_html else soup.get_text()
+        # Use trafilatura to get clean text content, with fallback to soup
+        text_content = None
+        if raw_html:
+            try:
+                text_content = trafilatura.extract(raw_html)
+            except:
+                pass
+        
+        if not text_content:
+            text_content = soup.get_text() if soup else ""
+        
+        if not text_content:
+            text_content = ""
         
         # Look for common pricing patterns
         price_patterns = [
@@ -342,13 +353,16 @@ class CompetitorScraper:
         
         pricing_info = []
         for pattern in price_patterns:
-            matches = re.findall(pattern, text_content, re.IGNORECASE)
-            pricing_info.extend(matches)
+            try:
+                matches = re.findall(pattern, text_content, re.IGNORECASE)
+                pricing_info.extend(matches)
+            except:
+                continue
         
         # Try to find plan names and structure
         plan_keywords = ['basic', 'starter', 'pro', 'enterprise', 'premium', 'growth', 'scale', 'free', 'standard']
         
-        lines = text_content.split('\n')
+        lines = text_content.split('\n') if text_content else []
         current_plan = None
         
         for line in lines:
@@ -377,11 +391,15 @@ class CompetitorScraper:
                 'description': 'Pricing information extracted from page content'
             })
         
+        extract_text = ""
+        if text_content and len(text_content) > 0:
+            extract_text = text_content[:500] + '...' if len(text_content) > 500 else text_content
+        
         return {
             'plans': plans,
             'currency': 'Unknown',
             'billing_period': 'unknown',
-            'raw_text_extract': text_content[:500] + '...' if len(text_content) > 500 else text_content,
+            'raw_text_extract': extract_text,
             'pricing_mentions': pricing_info[:10]  # First 10 pricing mentions
         }
 

@@ -264,8 +264,13 @@
                                     <strong>{{ competitor_data.name }}</strong>
                                 </td>
                                 <td>
-                                    {% set free_plans = pricing.plans|selectattr('price', 'match', '.*(?:free|gratis|0).*')|list %}
-                                    {% if free_plans %}
+                                    {% set has_free = [] %}
+                                    {% for plan in pricing.plans %}
+                                        {% if 'free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0') %}
+                                            {% set _ = has_free.append(1) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if has_free %}
                                         <span class="badge bg-success">Yes</span>
                                     {% else %}
                                         <span class="badge bg-secondary">No</span>
@@ -273,23 +278,25 @@
                                 </td>
                                 <td>
                                     {% if pricing.plans %}
-                                        {% set paid_plans = pricing.plans|rejectattr('price', 'match', '.*(?:free|gratis|0).*')|list %}
-                                        {% if paid_plans %}
-                                            {{ paid_plans[0].price }}
-                                        {% else %}
-                                            {{ pricing.plans[0].price }}
-                                        {% endif %}
+                                        {% set first_paid = [] %}
+                                        {% for plan in pricing.plans %}
+                                            {% if not ('free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0')) and not first_paid %}
+                                                {% set _ = first_paid.append(plan.price) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {{ first_paid[0] if first_paid else pricing.plans[0].price }}
                                     {% else %}
                                         N/A
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% set enterprise_plans = pricing.plans|selectattr('name', 'match', '.*(enterprise|custom|scale).*')|list %}
-                                    {% if enterprise_plans %}
-                                        {{ enterprise_plans[0].price }}
-                                    {% else %}
-                                        N/A
-                                    {% endif %}
+                                    {% set enterprise_price = [] %}
+                                    {% for plan in pricing.plans %}
+                                        {% if 'enterprise' in plan.name.lower() or 'custom' in plan.name.lower() or 'scale' in plan.name.lower() %}
+                                            {% set _ = enterprise_price.append(plan.price) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {{ enterprise_price[0] if enterprise_price else 'N/A' }}
                                 </td>
                                 <td>
                                     <span class="badge bg-info">{{ pricing.currency or 'Unknown' }}</span>
