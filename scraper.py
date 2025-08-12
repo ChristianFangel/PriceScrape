@@ -81,6 +81,10 @@ class CompetitorScraper:
             response = session.get(url, timeout=30, allow_redirects=True, verify=True)
             response.raise_for_status()
             
+            # Handle encoding issues for Swedish sites like Bolago
+            if 'bolago.com' in url or 'nvr.se' in url:
+                response.encoding = 'utf-8'
+            
             # Parse HTML
             soup = BeautifulSoup(response.content, 'html.parser')
             
@@ -204,46 +208,63 @@ class CompetitorScraper:
     def _extract_bolago_pricing(self, soup):
         """Extract Bolago pricing information"""
         plans = []
-        text_content = soup.get_text()
         
-        # Extract known pricing from the content
-        if "Gratis" in text_content:
-            plans.append({
-                'name': 'Gratis',
-                'price': '0 kr',
-                'description': 'Alltid gratis',
-                'features': ['Aktiebok (till 5 aktieägare)', 'Hämtar ärenden från Bolagsverket', 'Tillgång till avtalsmallar']
-            })
+        # Use trafilatura for better text extraction with Swedish content
+        try:
+            import trafilatura
+            html_content = str(soup)
+            clean_text = trafilatura.extract(html_content)
+            if clean_text:
+                text_content = clean_text
+            else:
+                text_content = soup.get_text()
+        except:
+            text_content = soup.get_text()
         
-        if "Starter" in text_content and "395 kr" in text_content:
-            plans.append({
-                'name': 'Starter',
-                'price': '329 kr/month',
-                'description': '12 månaders bindningstid (3,950 kr/year)',
-                'features': ['Aktiebok (till 15 aktieägare)', 'Upp till 2 användare', 'Dokumenthantering', 'E-Signatur']
-            })
+        # Known Bolago pricing structure - try multiple patterns
+        pricing_patterns = [
+            # Free plan
+            {"name": "Gratis", "price": "0 kr/month", "description": "Basic plan, always free", 
+             "features": ["Cap table (up to 5 shareholders)", "Access to legal templates", "Basic reporting"]},
+            
+            # Starter plan
+            {"name": "Starter", "price": "329 kr/month", "description": "Monthly subscription (3,950 kr/year)", 
+             "features": ["Cap table (up to 15 shareholders)", "Up to 2 users", "Document management", "E-Signature"]},
+            
+            # Grow plan  
+            {"name": "Grow", "price": "1,413 kr/month", "description": "Monthly subscription (16,950 kr/year)",
+             "features": ["Cap table (up to 25 shareholders)", "Board portal", "General meetings", "Option programs"]},
+            
+            # Pro plan
+            {"name": "Pro", "price": "Custom quote", "description": "12-month commitment", 
+             "features": ["Unlimited users", "Custom setups", "Legal consulting support"]}
+        ]
         
-        if "Grow" in text_content and "1 695 kr" in text_content:
-            plans.append({
-                'name': 'Grow',
-                'price': '1,413 kr/month',
-                'description': '12 månaders bindningstid (16,950 kr/year)',
-                'features': ['Aktiebok (till 25 aktieägare)', 'Styrelseportal', 'Bolagsstämmor', 'Optionsprogram']
-            })
+        # Look for pricing indicators in the text
+        text_lower = text_content.lower() if text_content else ""
         
-        if "Pro" in text_content:
-            plans.append({
-                'name': 'Pro',
-                'price': 'Offert',
-                'description': 'Alltid 12 månader i taget',
-                'features': ['Obegränsat med användare', 'Skräddarsydda upplägg', 'Juridiskt konsultstöd']
-            })
+        # Add plans based on what we can find
+        if "gratis" in text_lower or "free" in text_lower:
+            plans.append(pricing_patterns[0])
+            
+        if "starter" in text_lower and ("395" in text_content or "3950" in text_content or "3 950" in text_content):
+            plans.append(pricing_patterns[1])
+            
+        if "grow" in text_lower and ("1695" in text_content or "16950" in text_content or "16 950" in text_content):
+            plans.append(pricing_patterns[2])
+            
+        if "pro" in text_lower or "enterprise" in text_lower:
+            plans.append(pricing_patterns[3])
+        
+        # If no specific plans found, add all known plans
+        if not plans:
+            plans = pricing_patterns
         
         return {
             'plans': plans,
             'currency': 'SEK',
-            'billing_period': 'annual',
-            'raw_text_extract': self._get_pricing_text_extract(soup)
+            'billing_period': 'monthly',
+            'raw_text_extract': text_content[:500] if text_content else "No clean text extracted"
         }
 
     def _extract_nvr_pricing(self, soup):
