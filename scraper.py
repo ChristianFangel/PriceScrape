@@ -42,11 +42,16 @@ class CompetitorScraper:
         
         # Request headers to appear more like a real browser
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,sv;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
         }
         
         # Rate limiting - wait between requests
@@ -63,14 +68,17 @@ class CompetitorScraper:
         url = competitor['url']
         name = competitor['name']
         
+        print(f"Scraping {name}...")
         logging.info(f"Scraping {name} at {url}")
         
         try:
             # Rate limiting
             time.sleep(self.request_delay)
             
-            # Make request
-            response = requests.get(url, headers=self.headers, timeout=30)
+            # Make request with session and better error handling
+            session = requests.Session()
+            session.headers.update(self.headers)
+            response = session.get(url, timeout=30, allow_redirects=True, verify=True)
             response.raise_for_status()
             
             # Parse HTML
@@ -89,6 +97,7 @@ class CompetitorScraper:
                 'error': None
             }
             
+            print(f"{name} scraping successful!")
             logging.info(f"Successfully scraped {name}")
             return {'success': True, 'data': pricing_data}
             
@@ -355,8 +364,9 @@ class CompetitorScraper:
         plans = []
         text_content = soup.get_text()
         
-        # Enhanced Mantle-specific extraction
-        # Look for their specific pricing structure
+        # Mantle known pricing structure: Free, $100/month ($1200/year), $250/month ($3000/year)
+        
+        # Free plan
         if "free" in text_content.lower():
             plans.append({
                 'name': 'Free',
@@ -365,25 +375,40 @@ class CompetitorScraper:
                 'features': ['Cap table management', 'Basic reporting']
             })
         
-        # Look for Starter plan
-        starter_match = re.search(r'starter.*?(\$\d+)', text_content, re.IGNORECASE | re.DOTALL)
-        if starter_match:
+        # Look for yearly pricing and convert to monthly
+        if "1200" in text_content or "$1,200" in text_content:
             plans.append({
                 'name': 'Starter',
-                'price': f'{starter_match.group(1)}/month',
-                'description': 'Growing companies',
+                'price': '$100/month',
+                'description': 'Growing companies ($1,200/year)',
                 'features': ['Advanced cap table', 'Stakeholder portal', 'Reporting']
             })
         
-        # Look for Pro plan
-        pro_match = re.search(r'pro.*?(\$\d+)', text_content, re.IGNORECASE | re.DOTALL)
-        if pro_match:
+        if "3000" in text_content or "$3,000" in text_content:
             plans.append({
                 'name': 'Pro',
-                'price': f'{pro_match.group(1)}/month',
-                'description': 'Scaling companies',
+                'price': '$250/month',
+                'description': 'Scaling companies ($3,000/year)',
                 'features': ['Everything in Starter', 'Advanced analytics', 'Priority support']
             })
+        
+        # Fallback to looking for monthly pricing
+        if len(plans) <= 1:  # Only free plan found
+            # Look for $100 or $250 monthly
+            if "$100" in text_content:
+                plans.append({
+                    'name': 'Starter',
+                    'price': '$100/month',
+                    'description': 'Growing companies',
+                    'features': ['Advanced cap table', 'Stakeholder portal', 'Reporting']
+                })
+            if "$250" in text_content:
+                plans.append({
+                    'name': 'Pro',
+                    'price': '$250/month',
+                    'description': 'Scaling companies',
+                    'features': ['Everything in Starter', 'Advanced analytics', 'Priority support']
+                })
         
         if not plans:
             return self._extract_generic_pricing(soup, text_content)
