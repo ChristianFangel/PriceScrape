@@ -28,11 +28,17 @@
             <h4>No Data Available</h4>
             <p>Click "Refresh All" to start scraping competitor pricing data.</p>
             <form method="POST" action="{{ url_for('refresh_data') }}" class="d-inline">
-                <button type="submit" class="btn btn-primary btn-lg">
+                <button type="submit" class="btn btn-primary btn-lg" id="start-scraping-btn">
                     <i class="bi bi-arrow-clockwise"></i>
                     Start Scraping
                 </button>
             </form>
+            <div id="start-progress-indicator" class="mt-3" style="display: none;">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Scraping...</span>
+            </div>
         </div>
     </div>
 </div>
@@ -283,30 +289,69 @@ document.addEventListener('DOMContentLoaded', function() {
     if (refreshAllBtn) {
         refreshAllBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            
+
             // Show progress indicator
             progressIndicator.style.display = 'block';
             refreshAllBtn.disabled = true;
             refreshAllBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> <span>Scraping...</span>';
-            
+
             const competitors = ['Carta', 'Bolago', 'NVR', 'Ledgy', 'Cake Equity', 'Mantle'];
             let currentIndex = 0;
-            
+            let progressActive = true;
+
             function updateProgress() {
+                if (!progressActive) return;
                 if (currentIndex < competitors.length) {
                     progressText.textContent = `Scraping ${competitors[currentIndex]}...`;
                     currentIndex++;
-                    setTimeout(updateProgress, 3000); // Update every 3 seconds
+                    setTimeout(updateProgress, 3000);
                 } else {
                     progressText.textContent = 'Finalizing results...';
-                    setTimeout(() => {
-                        // Submit the form
-                        refreshAllBtn.closest('form').submit();
-                    }, 1000);
                 }
             }
-            
+
             updateProgress();
+
+            // Use fetch to POST instead of submitting the form directly
+            fetch(refreshAllBtn.closest('form').action, { method: 'POST' })
+                .then(() => {
+                    progressActive = false;
+                    progressText.textContent = 'Finalizing results...';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(() => {
+                    progressActive = false;
+                    progressText.textContent = 'Failed to refresh. Please try again.';
+                    refreshAllBtn.disabled = false;
+                    refreshAllBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> <span id="refresh-all-text">Refresh All Data</span>';
+                });
+        });
+    }
+
+    // Handle start scraping button
+    const startScrapingBtn = document.getElementById('start-scraping-btn');
+    const startProgressIndicator = document.getElementById('start-progress-indicator');
+    if (startScrapingBtn && startProgressIndicator) {
+        startScrapingBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+
+            startProgressIndicator.style.display = 'inline-flex';
+            startScrapingBtn.disabled = true;
+            startScrapingBtn.innerHTML = '<div class="spinner-border spinner-border-sm text-light me-2" role="status"><span class="visually-hidden">Loading...</span></div> Scraping...';
+
+            fetch(startScrapingBtn.closest('form').action, { method: 'POST' })
+                .then(() => {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(() => {
+                    startProgressIndicator.style.display = 'none';
+                    startScrapingBtn.disabled = false;
+                    startScrapingBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Start Scraping';
+                });
         });
     }
 });
