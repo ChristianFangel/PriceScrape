@@ -122,6 +122,7 @@ def export_data():
         logging.error(f"Error exporting data: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/data')
 def api_data():
     """API endpoint to get all data"""
@@ -131,6 +132,50 @@ def api_data():
     except Exception as e:
         logging.error(f"Error getting API data: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+# New clear_data route inserted after /api/data and before error handlers
+@app.route('/clear_data', methods=['POST'])
+def clear_data():
+    """Clear all scraped data and return to the dashboard."""
+    try:
+        # Try to clear any in-memory data held by the scraper
+        try:
+            # Prefer an explicit clearer if your scraper exposes one
+            if hasattr(scraper, 'clear_all') and callable(getattr(scraper, 'clear_all')):
+                scraper.clear_all()
+            elif hasattr(scraper, 'reset') and callable(getattr(scraper, 'reset')):
+                scraper.reset()
+            elif hasattr(scraper, 'data'):
+                # Fallback: wipe common attribute names
+                if isinstance(scraper.data, dict):
+                    scraper.data.clear()
+                elif isinstance(scraper.data, list):
+                    scraper.data[:] = []
+                else:
+                    setattr(scraper, 'data', {})
+        except Exception:
+            # Don't fail clearing due to minor issues
+            pass
+
+        # Optionally remove common cache/storage files if they exist
+        for candidate in [
+            'attached_assets/pricing_data.json',
+            'pricing_data.json',
+            'data.json',
+            'cache.json'
+        ]:
+            try:
+                if os.path.exists(candidate):
+                    os.remove(candidate)
+            except Exception:
+                pass
+
+        flash('All data cleared.', 'success')
+    except Exception as e:
+        logging.error(f'Failed to clear data: {e}')
+        flash('Failed to clear data.', 'error')
+
+    return redirect(url_for('index'))
 
 @app.errorhandler(404)
 def not_found_error(error):

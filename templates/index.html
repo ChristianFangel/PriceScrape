@@ -89,8 +89,11 @@
 </div>
 
 <!-- Competitor Cards -->
+{% set carta_entry = data.items()|selectattr('0', 'equalto', 'carta')|list %}
+{% set other_entries = data.items()|rejectattr('0', 'equalto', 'carta')|list %}
+{% set sorted_data = other_entries + carta_entry %}
 <div class="row">
-    {% for competitor_id, competitor_data in data.items() %}
+    {% for competitor_id, competitor_data in sorted_data %}
     <div class="col-12 mb-4">
         <div class="card pricing-card h-100 {% if not competitor_data.success %}error-state{% endif %}">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -103,14 +106,6 @@
                         {% endif %}
                         {{ competitor_data.name }}
                     </h5>
-                    <div class="last-updated">
-                        <i class="bi bi-clock"></i>
-                        {% if competitor_data.last_updated %}
-                            {{ competitor_data.last_updated|from_iso|timesince }} ago
-                        {% else %}
-                            Never updated
-                        {% endif %}
-                    </div>
                 </div>
                 <div class="btn-group">
                     <a href="{{ url_for('refresh_single', competitor=competitor_id) }}" 
@@ -205,6 +200,9 @@
                         {% if competitor_data.error %}
                             <p class="small text-danger mb-0">{{ competitor_data.error }}</p>
                         {% endif %}
+                        {% if competitor_id == 'carta' %}
+                            <p class="small text-muted">Data seeded (site blocked)</p>
+                        {% endif %}
                         <div class="mt-3">
                             <a href="{{ url_for('refresh_single', competitor=competitor_id) }}" 
                                class="btn btn-outline-primary btn-sm">
@@ -218,9 +216,6 @@
             
             <div class="card-footer">
                 <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        Last updated: {{ competitor_data.last_updated|from_iso|timesince }} ago
-                    </small>
                     {% if competitor_data.success %}
                         <span class="badge bg-success">Active</span>
                     {% else %}
@@ -240,6 +235,12 @@
             <button type="submit" class="btn btn-primary btn-lg" id="refresh-all-btn">
                 <i class="bi bi-arrow-clockwise"></i>
                 <span id="refresh-all-text">Rescrape All Data</span>
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('clear_data') }}" class="d-inline ms-2">
+            <button type="submit" class="btn btn-danger btn-lg" id="clear-all-btn">
+                <i class="bi bi-trash"></i>
+                Clear All Data
             </button>
         </form>
         <div id="progress-indicator" class="mt-3" style="display: none;">

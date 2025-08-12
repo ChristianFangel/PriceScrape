@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 import time
 import logging
@@ -10,10 +12,6 @@ import trafilatura
 class CompetitorScraper:
     def __init__(self):
         self.competitors = {
-            'carta': {
-                'url': 'https://carta.com/uk/en/plans/pricing-for-companies/',
-                'name': 'Carta'
-            },
             'bolago': {
                 'url': 'https://bolago.com/se/priser/',
                 'name': 'Bolago'
@@ -75,11 +73,74 @@ class CompetitorScraper:
             # Rate limiting
             time.sleep(self.request_delay)
             
-            # Make request with session and better error handling
+            # Make request with session, retries and better error handling
             session = requests.Session()
-            session.headers.update(self.headers)
-            response = session.get(url, timeout=30, allow_redirects=True, verify=True)
-            response.raise_for_status()
+
+            # Retry strategy for transient errors
+            retry = Retry(
+                total=3,
+                backoff_factor=1.0,
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods={"GET", "HEAD"},
+            )
+            adapter = HTTPAdapter(max_retries=retry)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+
+            # Start with our default browser-like headers
+            session.headers.update({
+                **self.headers,
+                # Add a neutral referer; some sites block requests without one
+                "Referer": "https://www.google.com/",
+                # Bias to UK English for the Carta URL we target
+                "Accept-Language": "en-GB,en;q=0.9,sv;q=0.8",
+            })
+
+            # Prepare candidate URLs (Carta sometimes blocks certain regional paths)
+            candidate_urls = [url]
+            if "carta.com" in url:
+                candidate_urls = [
+                    url,
+                    # try non-regional path
+                    "https://carta.com/en/plans/pricing-for-companies/",
+                    # try generic pricing landing
+                    "https://carta.com/pricing/",
+                ]
+
+            last_exc = None
+            response = None
+            for candidate in candidate_urls:
+                try:
+                    logging.debug(f"Requesting {name} at {candidate} with session headers")
+                    response = session.get(candidate, timeout=30, allow_redirects=True, verify=True)
+
+                    # If explicitly forbidden, try a slightly different UA/headers once
+                    if response.status_code == 403 and "carta.com" in candidate:
+                        logging.warning("403 returned; retrying Carta with alternate headers")
+                        alt_headers = {
+                            # A newer Chrome UA sometimes helps
+                            "User-Agent": (
+                                "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                "Chrome/124.0.0.0 Safari/537.36"
+                            ),
+                            # Simplify Accept to look more like a real nav request
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                            "Referer": "https://www.google.com/",
+                        }
+                        response = session.get(candidate, headers=alt_headers, timeout=30, allow_redirects=True, verify=True)
+
+                    response.raise_for_status()
+                    url = candidate  # use the successful candidate for downstream parsing
+                    break
+                except requests.RequestException as ex:
+                    last_exc = ex
+                    logging.warning(f"Fetch failed for {candidate}: {ex}")
+                    response = None
+                    continue
+
+            if response is None:
+                raise last_exc if last_exc else requests.RequestException("Failed to fetch page")
             
             # Handle encoding issues for Swedish sites like Bolago
             if 'bolago.com' in url or 'nvr.se' in url:
