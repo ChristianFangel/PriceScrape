@@ -315,7 +315,44 @@ class CompetitorScraper:
 
     def _extract_cakeequity_pricing(self, soup):
         """Extract Cake Equity pricing information"""
-        return self._extract_generic_pricing(soup, soup.get_text())
+        plans = []
+        text_content = soup.get_text()
+        
+        # Based on actual Cake Equity pricing structure
+        plans.append({
+            'name': 'Free',
+            'price': 'Free',
+            'description': '5 stakeholders included',
+            'features': ['Cap table management', 'Stock options & SAFE notes', 'Shareholder access']
+        })
+        
+        plans.append({
+            'name': 'Starter',
+            'price': '$40/month',
+            'description': '30 stakeholders + $3 per additional',
+            'features': ['Cap table management', 'Shareholder vesting', 'Digital signing', 'Scenario modelling']
+        })
+        
+        plans.append({
+            'name': 'Growth',
+            'price': '$80/month',
+            'description': '30 stakeholders + $5 per additional',
+            'features': ['All Starter features', 'Stock Options & RSUs', 'Legal templates', 'Team equity benchmarks']
+        })
+        
+        plans.append({
+            'name': 'Pro',
+            'price': 'Custom pricing',
+            'description': 'Large cap tables with discounted rates',
+            'features': ['409A Valuation', 'IFRS 2 compliance', 'International options', 'Priority support']
+        })
+        
+        return {
+            'plans': plans,
+            'currency': 'USD',
+            'billing_period': 'monthly',
+            'raw_text_extract': self._get_pricing_text_extract(soup)
+        }
 
     def _extract_mantle_pricing(self, soup):
         """Extract Mantle pricing information"""

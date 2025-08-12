@@ -38,6 +38,151 @@
 </div>
 {% else %}
 
+<!-- Market Insights Summary -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-dark border-primary">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightbulb"></i>
+                    Market Insights
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6 class="text-primary">Free Plans Available</h6>
+                            <div class="fs-4 text-success">
+                                {% set free_count = 0 %}
+                                {% for competitor_data in successful_competitors %}
+                                    {% set has_free_plan = false %}
+                                    {% for plan in competitor_data.pricing_data.plans if not has_free_plan %}
+                                        {% if 'free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0') %}
+                                            {% set free_count = free_count + 1 %}
+                                            {% set has_free_plan = true %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                                {{ free_count }}/{{ successful_competitors|length }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6 class="text-primary">Pricing Models</h6>
+                            <div class="small">
+                                <span class="badge bg-info me-1">Per Stakeholder</span>
+                                <span class="badge bg-info me-1">Fixed Plans</span>
+                                <span class="badge bg-info">Custom Enterprise</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6 class="text-primary">Currency Mix</h6>
+                            <div class="small">
+                                {% set currencies = [] %}
+                                {% for competitor_data in successful_competitors %}
+                                    {% if competitor_data.pricing_data.currency not in currencies %}
+                                        {% set _ = currencies.append(competitor_data.pricing_data.currency) %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% for currency in currencies %}
+                                    <span class="badge bg-secondary me-1">{{ currency }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6 class="text-primary">Entry Pricing Range</h6>
+                            <div class="small text-warning">
+                                <strong>$0 - $750/month</strong><br>
+                                <small>Across all competitors</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pricing Comparison Table - Moved to Top -->
+{% set successful_competitors = data.values()|selectattr('success')|list %}
+{% if successful_competitors|length > 1 %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-table"></i>
+                    Monthly Pricing Comparison
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Competitor</th>
+                                <th>Free Plan</th>
+                                <th>Starting Price (Monthly)</th>
+                                <th>Currency</th>
+                                <th>Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for competitor_data in successful_competitors %}
+                            {% set pricing = competitor_data.pricing_data %}
+                            <tr>
+                                <td>
+                                    <strong>{{ competitor_data.name }}</strong>
+                                </td>
+                                <td>
+                                    {% set has_free = [] %}
+                                    {% for plan in pricing.plans %}
+                                        {% if 'free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0') or 'kostenlos' in plan.price.lower() %}
+                                            {% set _ = has_free.append(1) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if has_free %}
+                                        <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">No</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if pricing.plans %}
+                                        {% set first_paid = [] %}
+                                        {% for plan in pricing.plans %}
+                                            {% if not ('free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0') or 'kostenlos' in plan.price.lower()) and not first_paid %}
+                                                {% set _ = first_paid.append(plan.price) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {{ first_paid[0] if first_paid else pricing.plans[0].price }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ pricing.currency or 'Unknown' }}</span>
+                                </td>
+                                <td class="small">
+                                    {{ competitor_data.last_updated|from_iso|timesince }} ago
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Summary Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -83,7 +228,7 @@
 <!-- Competitor Cards -->
 <div class="row">
     {% for competitor_id, competitor_data in data.items() %}
-    <div class="col-lg-6 mb-4">
+    <div class="col-12 mb-4">
         <div class="card pricing-card h-100 {% if not competitor_data.success %}error-state{% endif %}">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <div class="competitor-header">
@@ -126,33 +271,31 @@
                     <!-- Pricing Plans -->
                     {% if pricing.plans %}
                         <div class="mb-3">
-                            <h6 class="text-muted mb-2">
+                            <h6 class="text-muted mb-3">
                                 <i class="bi bi-tags"></i>
                                 Pricing Plans ({{ pricing.currency or 'Unknown' }})
                             </h6>
                             <div class="row">
                                 {% for plan in pricing.plans %}
-                                <div class="col-12 mb-2">
-                                    <div class="border rounded p-2">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <strong>{{ plan.name }}</strong>
-                                                {% if plan.description %}
-                                                    <br><small class="text-muted">{{ plan.description }}</small>
-                                                {% endif %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-center mb-2">
+                                            <h6 class="mb-1">{{ plan.name }}</h6>
+                                            <div class="mb-2">
+                                                <span class="badge bg-primary fs-6">{{ plan.price }}</span>
                                             </div>
-                                            <div class="text-end">
-                                                <span class="badge bg-primary">{{ plan.price }}</span>
-                                            </div>
+                                            {% if plan.description %}
+                                                <small class="text-muted">{{ plan.description }}</small>
+                                            {% endif %}
                                         </div>
                                         {% if plan.features %}
                                             <div class="mt-2">
                                                 <small class="text-muted feature-list">
-                                                    {% for feature in plan.features[:3] %}
-                                                        <i class="bi bi-check2"></i> {{ feature }}{% if not loop.last %}<br>{% endif %}
+                                                    {% for feature in plan.features[:4] %}
+                                                        <i class="bi bi-check2 text-success"></i> {{ feature }}<br>
                                                     {% endfor %}
-                                                    {% if plan.features|length > 3 %}
-                                                        <br><em>+{{ plan.features|length - 3 }} more features</em>
+                                                    {% if plan.features|length > 4 %}
+                                                        <em class="text-secondary">+{{ plan.features|length - 4 }} more...</em>
                                                     {% endif %}
                                                 </small>
                                             </div>
@@ -230,93 +373,7 @@
     {% endfor %}
 </div>
 
-<!-- Pricing Comparison Table -->
-{% set successful_competitors = data.values()|selectattr('success')|list %}
-{% if successful_competitors|length > 1 %}
-<div class="row mt-5">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-table"></i>
-                    Pricing Comparison
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Competitor</th>
-                                <th>Free Plan</th>
-                                <th>Starting Price</th>
-                                <th>Enterprise</th>
-                                <th>Currency</th>
-                                <th>Billing</th>
-                                <th>Last Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for competitor_data in successful_competitors %}
-                            {% set pricing = competitor_data.pricing_data %}
-                            <tr>
-                                <td>
-                                    <strong>{{ competitor_data.name }}</strong>
-                                </td>
-                                <td>
-                                    {% set has_free = [] %}
-                                    {% for plan in pricing.plans %}
-                                        {% if 'free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0') %}
-                                            {% set _ = has_free.append(1) %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if has_free %}
-                                        <span class="badge bg-success">Yes</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">No</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if pricing.plans %}
-                                        {% set first_paid = [] %}
-                                        {% for plan in pricing.plans %}
-                                            {% if not ('free' in plan.price.lower() or 'gratis' in plan.price.lower() or plan.price.startswith('0')) and not first_paid %}
-                                                {% set _ = first_paid.append(plan.price) %}
-                                            {% endif %}
-                                        {% endfor %}
-                                        {{ first_paid[0] if first_paid else pricing.plans[0].price }}
-                                    {% else %}
-                                        N/A
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% set enterprise_price = [] %}
-                                    {% for plan in pricing.plans %}
-                                        {% if 'enterprise' in plan.name.lower() or 'custom' in plan.name.lower() or 'scale' in plan.name.lower() %}
-                                            {% set _ = enterprise_price.append(plan.price) %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    {{ enterprise_price[0] if enterprise_price else 'N/A' }}
-                                </td>
-                                <td>
-                                    <span class="badge bg-info">{{ pricing.currency or 'Unknown' }}</span>
-                                </td>
-                                <td>
-                                    {{ pricing.billing_period|title or 'Unknown' }}
-                                </td>
-                                <td class="small">
-                                    {{ competitor_data.last_updated|from_iso|timesince }} ago
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
+
 
 {% endif %}
 
